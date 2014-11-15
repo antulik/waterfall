@@ -265,22 +265,29 @@
     //init item properties once item appended
     _initItem: function(el) {
       var o = this.options,
-          span = el.getAttribute('data-span') || 1,
-          floatVal = el.getAttribute('data-float') || el.getAttribute('data-column'),
-          floatCols = el.getAttribute('data-float-cols'),
-          expandCols = el.getAttribute('data-expand-cols');
+          spans = el.getAttribute('data-span') || '',
+          columns = el.getAttribute('data-column') || '';
+      var column, span;
+
+      spans = spans.replace(/ /g, '').split(',');
+      for (var i = 0; i < spans.length; i++) {
+        span = spans[i];
+        column = i+1;
+
+        if (span || i === 0) {
+          span = (span === 'all' ? o.maxCols : Math.max(0, Math.min(~~(span), o.maxCols)));
+          if (column > 1 && span > column) {
+            span = column;
+          }
+        } else {
+          span = spans[0];
+        }
+        spans[i] = span;
+      }
+      el.spans = spans;
 
       //set span
-      span = (span === 'all' ? o.maxCols : Math.max(0, Math.min(~~(span), o.maxCols)));
-      el.span = span; //quite bad, but no choice: dataset is sloow
-
-      el.floatMaxCols = ~~(floatCols);
-
-      expandCols = ~~(expandCols);
-      if (expandCols == 0) {
-        expandCols = false;
-      }
-      el.expandMaxCols = expandCols;
+      el.span = spans[0] || 1; //quite bad, but no choice: dataset is sloow
 
       //save heavy style-attrs
       var style = getComputedStyle(el);
@@ -295,23 +302,36 @@
       el.style.position = 'absolute';
       //this._setItemWidth(el); //make it external action to not to init frominside create
 
-      //parset float
-      switch (floatVal) {
-        case null: //no float
-          el.floatCol = null;
-          break;
-        case 'right':
-        case 'last':
-          el.floatCol = -span;
-          break;
-        case 'left':
-        case 'first':
-          el.floatCol = 0;
-          break;
-        default: //int column
-          el.floatCol = ~~(floatVal) - 1;
-          break;
+      columns = columns.replace(/ /g, '').split(',');
+      for (var i = 0; i < columns.length; i++) {
+        var floatVal = columns[i];
+
+        switch (floatVal) {
+          case '':
+            floatVal = (i > 0 ? columns[0] : null);
+            break;
+          case null:
+          case 'any':
+            //no float
+            floatVal = null;
+            break;
+          case 'right':
+          case 'last':
+            floatVal = -1;
+            break;
+          case 'left':
+          case 'first':
+            floatVal = 0;
+            break;
+          default: //int column
+            floatVal = ~~(floatVal) - 1;
+            break;
+        }
+
+        columns[i] = floatVal;
       }
+      el.floatCol = columns[0];
+      el.columns = columns;
 
       if (o.animateShow) {
         if (o.useTranslate3d) {
@@ -394,13 +414,17 @@
 
     //set item width based on span/colWidth
     _setItemWidth: function(el) {
-      var span = el.span > this.lastItems.length ? this.lastItems.length : el.span,
+      var span = el.span,
+          spans = el.spans,
           cols = this.lastItems.length;
 
-      // auto expand item if allowed
-      if (el.expandMaxCols && el.expandMaxCols >= this.lastItems.length) {
-        span = this.lastItems.length;
+      if (spans.length >= cols) {
+        if (spans[cols - 1]) {
+          span = spans[cols - 1];
+        }
       }
+      span = span > this.lastItems.length ? this.lastItems.length : span;
+
       var colWeight = span / cols;
 
       if (this.options.useCalc) {
@@ -426,13 +450,14 @@
           t = 0,
           end = 0,
           start = 0,
-          span = e.span > lastItems.length ? lastItems.length : e.span,
+          span = e.span,
+          spans = e.spans,
           newH = 0,
           spanCols = [], //numbers of spanned columns
           spanHeights = [], //heights of spanned columns
           style,
           floatCol = e.floatCol,
-          floatMaxCols = e.floatMaxCols || o.floatMaxCols;
+          columns = e.columns;
 
       //console.log('------ item:' + e.innerHTML)
       //console.log('span:'+span)
@@ -440,15 +465,22 @@
       //Find pro→per column to place item
       //console.log(colPriority)
 
-      if (floatCol && lastItems.length >= floatMaxCols) {
-        floatCol = floatCol > 0 ? Math.min(floatCol, lastItems.length - span) : (lastItems.length + floatCol);
-      } else {
-        floatCol = null;
+      if (spans.length >= lastItems.length) {
+        if (spans[lastItems.length - 1]) {
+          span = spans[lastItems.length - 1];
+        }
+      }
+      span = span > lastItems.length ? lastItems.length : span;
+
+      if (columns.length >= lastItems.length) {
+        floatCol = columns[lastItems.length - 1];
+      }
+      if (floatCol < 0) {
+        floatCol = -span;
       }
 
-      // auto expand item
-      if (e.expandMaxCols && e.expandMaxCols >= lastItems.length) {
-        span = lastItems.length;
+      if (floatCol) {
+        floatCol = floatCol > 0 ? Math.min(floatCol, lastItems.length - span) : (lastItems.length + floatCol);
       }
 
       if (span === 1) {
@@ -579,7 +611,6 @@
       var $this = $(this),
           dataParams = {},
           defaultOptions = window.waterfall || {},
-          dataFloatCols = $this[0].getAttribute("data-float-cols"),
           dataMaxCols = $this[0].getAttribute("data-max-cols"),
           dataColMinWidth = $this[0].getAttribute("data-col-min-width"),
           dataWidth = $this[0].getAttribute("data-width");
@@ -589,9 +620,6 @@
       }
       if (dataMaxCols) {
         dataParams.maxCols = ~~dataMaxCols;
-      }
-      if (dataFloatCols) {
-        dataParams.floatMaxCols = ~~dataFloatCols;
       }
 
       var opts = $.extend({}, defaultOptions, dataParams, arg);
