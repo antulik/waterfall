@@ -24,6 +24,7 @@
       useCalc: undefined, //set width through -prefix-calc value. Values: true, false, undefined. Autodetection.
       useTranslate3d: undefined, //place items through translate3d instead of top/left. Values: true, false, undefined. Autodetection
       animateShow: false, //whether to animate appending items (causes browser extra-reflows, slows down rendering)
+      floatMaxCols: 0, // when to start floating elements
 
       //callbacks
       reflow: null
@@ -265,11 +266,21 @@
     _initItem: function(el) {
       var o = this.options,
           span = el.getAttribute('data-span') || 1,
-          floatVal = el.getAttribute('data-float') || el.getAttribute('data-column');
+          floatVal = el.getAttribute('data-float') || el.getAttribute('data-column'),
+          floatCols = el.getAttribute('data-float-cols'),
+          expandCols = el.getAttribute('data-expand-cols');
 
       //set span
       span = (span === 'all' ? o.maxCols : Math.max(0, Math.min(~~(span), o.maxCols)));
       el.span = span; //quite bad, but no choice: dataset is sloow
+
+      el.floatMaxCols = ~~(floatCols);
+
+      expandCols = ~~(expandCols);
+      if (expandCols == 0) {
+        expandCols = false;
+      }
+      el.expandMaxCols = expandCols;
 
       //save heavy style-attrs
       var style = getComputedStyle(el);
@@ -330,10 +341,15 @@
       self.colPriority.length = 0; //most left = most minimal column
       self.baseOrder.length = 0;
 
-      self.colWidth = self.el.clientWidth - self.pl - self.pr;
+      var clientWidth = self.el.clientWidth || self.options.defaultContainerWidth;
+      self.colWidth = clientWidth - self.pl - self.pr;
 
       self.lastItems.length = ~~(self.colWidth / o.colMinWidth) || 1; //needed length
-      console.log(o.colMinWidth)
+
+      if (self.lastItems.length > self.options.maxCols) {
+        self.lastItems.length = self.options.maxCols;
+      }
+      //console.log(o.colMinWidth);
 
       var top = o.useTranslate3d ? 0 : self.pt;
       for (i = 0; i < self.lastItems.length; i++) {
@@ -379,8 +395,14 @@
     //set item width based on span/colWidth
     _setItemWidth: function(el) {
       var span = el.span > this.lastItems.length ? this.lastItems.length : el.span,
-          cols = this.lastItems.length,
-          colWeight = span / cols;
+          cols = this.lastItems.length;
+
+      // auto expand item if allowed
+      if (el.expandMaxCols && el.expandMaxCols >= this.lastItems.length) {
+        span = this.lastItems.length;
+      }
+      var colWeight = span / cols;
+
       if (this.options.useCalc) {
         el.w = (100 * colWeight);
         el.style.width = this.prefixedCalc + '(' + (100 * colWeight) + '% - ' + (el.mr + el.ml + (this.pl + this.pr) * colWeight) + 'px)';
@@ -409,16 +431,26 @@
           spanCols = [], //numbers of spanned columns
           spanHeights = [], //heights of spanned columns
           style,
-          floatCol = e.floatCol;
+          floatCol = e.floatCol,
+          floatMaxCols = e.floatMaxCols || o.floatMaxCols;
 
       //console.log('------ item:' + e.innerHTML)
       //console.log('span:'+span)
 
       //Find pro→per column to place item
       //console.log(colPriority)
-      if (floatCol) {
+
+      if (floatCol && lastItems.length >= floatMaxCols) {
         floatCol = floatCol > 0 ? Math.min(floatCol, lastItems.length - span) : (lastItems.length + floatCol);
+      } else {
+        floatCol = null;
       }
+
+      // auto expand item
+      if (e.expandMaxCols && e.expandMaxCols >= lastItems.length) {
+        span = lastItems.length;
+      }
+
       if (span === 1) {
         //Single-span element
         if (floatCol === null) {
@@ -492,6 +524,7 @@
       //if element was added first time and is out of flow - show it
       //e.style.opacity = 1;
       e.removeAttribute('hidden');
+      e.style.visibility = 'visible';
 
       newH = self._getBottom(e); //this is the most difficult operation (e.clientHeight)
       for (t = 0; t < spanCols.length; t++) {
@@ -541,11 +574,28 @@
       });
     } else {
       if (!this.length) {
-        throw new Error("No element passed to waterfall")
         return false;
       };
       var $this = $(this),
-          opts = $.extend({}, {"colMinWidth": ~~$this[0].getAttribute("data-col-min-width") ||~~$this[0].getAttribute("data-width")}, arg);
+          dataParams = {},
+          defaultOptions = window.waterfall || {},
+          dataFloatCols = $this[0].getAttribute("data-float-cols"),
+          dataMaxCols = $this[0].getAttribute("data-max-cols"),
+          dataColMinWidth = $this[0].getAttribute("data-col-min-width"),
+          dataWidth = $this[0].getAttribute("data-width");
+
+      if (dataColMinWidth || dataWidth) {
+        dataParams.colMinWidth = ~~dataColMinWidth || ~~dataWidth
+      }
+      if (dataMaxCols) {
+        dataParams.maxCols = ~~dataMaxCols;
+      }
+      if (dataFloatCols) {
+        dataParams.floatMaxCols = ~~dataFloatCols;
+      }
+
+      var opts = $.extend({}, defaultOptions, dataParams, arg);
+
       if (opts.width && !opts.colMinWidth) {
         opts.colMinWidth = opts.width;
       }
@@ -577,7 +627,7 @@
     $('.' + defClass)
         .each(function(i, e) {
           var $e = $(e),
-              opts = window.waterfall || {};
+              opts = {};
           $e.waterfall(opts);
         });
   });
