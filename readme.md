@@ -1,10 +1,9 @@
 # jQuery.waterfall + modification by antulik
 
-jQuery.waterfall is [Pinterest](http://pinterest.com)-like layout with fluid width of columns. Fast, tiny, reliable and free alternative to [isotope masonry column shift](http://isotope.metafizzy.co/custom-layout-modes/masonry-column-shift.html) layout.
-
-This is a fork of [dfcreative/waterfall](https://github.com/dfcreative/waterfall) version. 
-
-In this version you can easily build custom responsive layouts and replace CSS media queries.
+- It provides functionality for column based layout.
+- It's [Pinterest](http://pinterest.com)-like layout with fluid width of columns. 
+- Fast, tiny, reliable and free alternative to [isotope masonry column shift](http://isotope.metafizzy.co/custom-layout-modes/masonry-column-shift.html) layout.
+- This is a fork of [dfcreative/waterfall](https://github.com/dfcreative/waterfall) version.  In this version you can easily build custom responsive layouts and replace CSS media queries.
 
 ## Getting started
 
